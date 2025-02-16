@@ -1,31 +1,25 @@
-FROM mzz2017/git:alpine AS version
+# Step 1: Get the version number
+FROM alpine AS version
 WORKDIR /build
-ADD .git ./.git
-RUN git describe --abbrev=0 --tags | tee ./version
+RUN echo "v2.0.0" > ./version  
 
+# Step 2: Build the web interface
 FROM node:lts-alpine AS builder-web
 ADD gui /build/gui
 WORKDIR /build/gui
-RUN echo "network-timeout 600000" >> .yarnrc
 RUN yarn cache clean && yarn && yarn build
 
+# Step 3: Build the V2Ray service
 FROM golang:alpine AS builder
 ADD service /build/service
 WORKDIR /build/service
 COPY --from=version /build/version ./
 COPY --from=builder-web /build/web server/router/web
-RUN export VERSION=$(cat ./version) && CGO_ENABLED=0 go build -ldflags="-X github.com/v2rayA/v2rayA/conf.Version=${VERSION:1} -s -w" -o v2raya .
+RUN export VERSION=$(cat ./version) && CGO_ENABLED=0 go build -o v2raya .
 
-FROM v2fly/v2fly-core
+# Step 4: Run V2Ray on a proper base image
+FROM ghcr.io/v2fly/v2fly-core AS runtime
 COPY --from=builder /build/service/v2raya /usr/bin/
-RUN wget -O /usr/local/share/v2ray/LoyalsoldierSite.dat https://raw.githubusercontent.com/mzz2017/dist-v2ray-rules-dat/master/geosite.dat
 RUN apk add --no-cache iptables ip6tables tzdata
-LABEL org.opencontainers.image.source=https://github.com/v2rayA/v2rayA
-
 EXPOSE 2017
-
-# Remove this line (VOLUME is not allowed in Railway)
-# VOLUME /etc/v2raya
-
-# Use Railway’s persistent storage instead
-CMD mkdir -p /persistent/v2raya && cp -r /etc/v2raya /persistent/v2raya || true && v2raya
+ENTRYPOINT ["v2raya"]
