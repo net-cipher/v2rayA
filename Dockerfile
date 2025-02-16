@@ -3,13 +3,10 @@ WORKDIR /build
 ADD .git ./.git
 RUN git describe --abbrev=0 --tags | tee ./version
 
-
 FROM node:lts-alpine AS builder-web
 ADD gui /build/gui
 WORKDIR /build/gui
 RUN echo "network-timeout 600000" >> .yarnrc
-#RUN yarn config set registry https://registry.npm.taobao.org
-#RUN yarn config set sass_binary_site https://cdn.npm.taobao.org/dist/node-sass -g
 RUN yarn cache clean && yarn && yarn build
 
 FROM golang:alpine AS builder
@@ -24,6 +21,11 @@ COPY --from=builder /build/service/v2raya /usr/bin/
 RUN wget -O /usr/local/share/v2ray/LoyalsoldierSite.dat https://raw.githubusercontent.com/mzz2017/dist-v2ray-rules-dat/master/geosite.dat
 RUN apk add --no-cache iptables ip6tables tzdata
 LABEL org.opencontainers.image.source=https://github.com/v2rayA/v2rayA
+
 EXPOSE 2017
-VOLUME /etc/v2raya
-ENTRYPOINT ["v2raya"]
+
+# Remove this line (VOLUME is not allowed in Railway)
+# VOLUME /etc/v2raya
+
+# Use Railway’s persistent storage instead
+CMD mkdir -p /persistent/v2raya && cp -r /etc/v2raya /persistent/v2raya || true && v2raya
