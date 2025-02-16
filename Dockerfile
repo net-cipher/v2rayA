@@ -4,7 +4,7 @@ WORKDIR /build
 RUN echo "v2.0.0" > ./version  
 
 # Step 2: Build the web interface
-FROM node:lts-alpine AS builder-web
+FROM ghcr.io/library/node:lts-alpine AS builder-web
 ADD gui /build/gui
 WORKDIR /build/gui
 RUN yarn cache clean && yarn && yarn build
